@@ -3,6 +3,10 @@ import pandas as pd
 from torch.utils.data.dataset import Dataset
 import cv2
 
+IMG_H = "img"
+VIDEO_H = "video"
+VIDEO_H = "video"
+
 
 class CustomDatasetFromImages(Dataset):
     def __init__(self, csv_path, transform=None, fps_sample=3):
@@ -26,16 +30,17 @@ class CustomDatasetFromImages(Dataset):
         diff_pts = diff_pts[diff_pts > 0]
 
         median_diff, mean_diff, std_diff = np.median(diff_pts), diff_pts.mean(), diff_pts.std()
-
-        print(f"Video FPS -  median: {1./median_diff}, mean: {1./mean_diff}, std: {1./std_diff}")
+        print(f"Video FPS -  median: {1./median_diff}, mean: {1./mean_diff}")
+        print(f"Video FPS - std: {std_diff} max: {diff_pts.mean()}")
         print(f"____WILL CONSIDER FIX FPS for frame offset calc_____ {1./median_diff}")
 
         self.dist_frames = median_diff
 
         # Third column is for pts viedo -> get groups based on fps sample
         bins = np.arange(0, data_info.pts.max(), 1. / fps_sample)
-        data_info["interval"] = data_info.pts.apply(pd.cut, bins=bins, include_lowest=True)\
-            .values.codes
+        interval = data_info.groupby("video").pts.apply(pd.cut, bins=bins,
+                                                    include_lowest=True).values.codes
+        data_info["interval"] = interval
 
         # Calculate len
         self.data_len = len(self.data_info.index)
@@ -51,12 +56,15 @@ class CustomDatasetFromImages(Dataset):
         dist_frames = self.dist_frames
         time_diff = self.time_diff
 
+        print("Get first index ...")
         sample_start_idx = df.groupby(["video", "interval"]).apply(lambda x: x.sample())
 
+        print("Select second index ...")
         first_idx = sample_start_idx.index.levels[2]
         idx_dist = max(1, int(time_diff / dist_frames))
         second_idx = first_idx + idx_dist
 
+        print("Filter indexes ...")
         # Filter idx that does not exist
         has_df = second_idx < len(df)
         first_idx = first_idx[has_df]
@@ -73,6 +81,7 @@ class CustomDatasetFromImages(Dataset):
         self.data_len = len(first_idx)
 
     def __getitem__(self, index):
+        # TODO Reset group indexes after each epoch!
         # Open image
         img_first = cv2.imread(self.first_idx[index])
         img_second = cv2.imread(self.second_idx[index])
@@ -97,5 +106,6 @@ class CustomDatasetFromImages(Dataset):
 
 
 if __name__ == "__main__":
+    # TODO Check config
 
-    dataset = CustomDatasetFromImages("results/")
+    dataset = CustomDatasetFromImages("/media/andrei/Samsung_T51/data/dataset.csv")

@@ -1,7 +1,8 @@
-out_dir2: "results"
+out_dir: results
+dataset_csv: /media/andrei/Samsung_T51/data/dataset.csv
 
 model:
-  name: BaseModela
+  name: BaseModel
 
 train:
   algorithm: SGD
