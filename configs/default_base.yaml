@@ -1,0 +1,9 @@
+out_dir2: "results"
+
+model:
+  name: BaseModela
+
+train:
+  algorithm: SGD
+  algorithm_args:
+    lr: 0.0001
