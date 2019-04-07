@@ -1,107 +1,110 @@
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-import torchvision
-from torchvision import datasets, transforms
 import matplotlib.pyplot as plt
-import numpy as np
-from torchvision.models.resnet import BasicBlock, conv1x1
-import pandas as pd
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms
-import os
 from argparse import Namespace
 from liftoff.config import read_config
+import os
+from typing import List
 
 from utils import dataloader
-from utils.utils import convert_image_np
 from models import get_model
+
+from utils.logger import MultiLogger
+from utils.save_training import SaveData
+from train_loop.train_base import TrainBase
+from train_loop import get_train
 
 plt.ion()   # interactive mode
 
 
-def train(epoch, train_loader, model, optimizer, device):
-    model.train()
-    for batch_idx, (data, target) in enumerate(train_loader):
-        data, target = data.to(device), target.to(device)
-
-        optimizer.zero_grad()
-        output = model(data, data)
-        loss = F.nll_loss(output, target)
-        loss.backward()
-        optimizer.step()
-        if batch_idx % 500 == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(data), len(train_loader.dataset),
-                100. * batch_idx / len(train_loader), loss.item()))
+MAIN_CFG_ARGS = ["train", "model"]
 
 
-def test(test_loader, model, device):
-    with torch.no_grad():
-        model.eval()
-        test_loss = 0
-        correct = 0
-        for data, target in test_loader:
-            data, target = data.to(device), target.to(device)
-            output = model(data)
-
-            # sum up batch loss
-            test_loss += F.nll_loss(output, target, size_average=False).item()
-            # get the index of the max log-probability
-            pred = output.max(1, keepdim=True)[1]
-            correct += pred.eq(target.view_as(pred)).sum().item()
-
-        test_loss /= len(test_loader.dataset)
-        print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'
-              .format(test_loss, correct, len(test_loader.dataset),
-                      100. * correct / len(test_loader.dataset)))
-
-
-def visualize_stn(test_loader, model, device):
-    with torch.no_grad():
-        # Get a batch of training data
-        data = next(iter(test_loader))[0].to(device)
-
-        input_tensor = data.cpu()
-        transformed_input_tensor = model.stn(data).cpu()
-
-        in_grid = convert_image_np(
-            torchvision.utils.make_grid(input_tensor))
-
-        out_grid = convert_image_np(
-            torchvision.utils.make_grid(transformed_input_tensor))
-
-        # Plot the results side-by-side
-        f, axarr = plt.subplots(1, 2)
-        axarr[0].imshow(in_grid)
-        axarr[0].set_title('Dataset Images')
-
-        axarr[1].imshow(out_grid)
-        axarr[1].set_title('Transformed Images')
+def add_to_cfg(cfg: Namespace, subgroups: List[str], new_arg: str, new_arg_value) -> None:
+    for arg in subgroups:
+        if hasattr(cfg, arg):
+            setattr(getattr(cfg, arg), new_arg, new_arg_value)
 
 
 def run(cfg: Namespace) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    dataset = cfg.dataset_csv
+    batch_size = cfg.batch_size
+    shuffle = cfg.shuffle
+    num_workers = cfg.num_workers
+    epochs = cfg.epochs
+    test_freq = cfg.test_freq
+
+    out_dir = getattr(cfg, "out_dir")
+    add_to_cfg(cfg, MAIN_CFG_ARGS, "out_dir", out_dir)
+    print(out_dir)
+
+    # ----------------------------------------------------------------------------------------------
+    # Data loaders
+    img_size = cfg.input_size
 
     # TODO change train loader
+    train_transformer = transforms.Compose([
+        transforms.ToPILImage(),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                             std=[0.229, 0.224, 0.225])
+    ])
     train_loader = torch.utils.data.DataLoader(
-        datasets.MNIST(root='.', train=True, download=True,
-                       transform=transforms.Compose([
-                           transforms.Resize(224),
-                           transforms.ToTensor(),
-                           transforms.Normalize((0.1307,), (0.3081,))
-                       ])), batch_size=64, shuffle=True, num_workers=4)
+        dataloader.CustomDatasetFromImages(dataset, img_size, transform=train_transformer),
+        batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
+    test_loader = None
+
+    # ----------------------------------------------------------------------------------------------
+
+    # ----------------------------------------------------------------------------------------------
+    # Load model
 
     model = get_model(cfg.model).to(device)
+
+    # ----------------------------------------------------------------------------------------------
+    # Load optim
 
     _optimizer = getattr(torch.optim, cfg.train.algorithm)
     optim_args = vars(cfg.train.algorithm_args)
     optimizer = _optimizer(model.parameters(), **optim_args)
 
-    for epoch in range(1, 20 + 1):
-        train(epoch, train_loader, model, optimizer, device)
-        # test(test_loader, model, device)
+    # ----------------------------------------------------------------------------------------------
+    # Load logger
+
+    logger = MultiLogger(out_dir, cfg.tb)
+
+    # Log command and all script arguments
+
+    logger.info("{}\n".format(cfg))
+
+    # ----------------------------------------------------------------------------------------------
+    # Load training status
+    saver = SaveData(out_dir, save_best=cfg.save_best, save_all=cfg.save_all)
+
+    checkpoint, crt_epoch = None, 1
+    try:
+        # Continue from last point
+        checkpoint = saver.load_training_data(best=False)
+        logger.info("Training data exists & loaded successfully\n")
+    except OSError:
+        logger.info("Could not load training data\n")
+
+    # ----------------------------------------------------------------------------------------------
+    # Load trainer
+    trainer = get_train(cfg.train, train_loader, test_loader,
+                        model, optimizer, device, saver, logger)  # type: TrainBase
+    if checkpoint is not None:
+        trainer.load(checkpoint)
+        crt_epoch = checkpoint["epoch"]
+
+    # ----------------------------------------------------------------------------------------------
+
+    for epoch in range(crt_epoch, epochs + 1):
+        trainer.train()
+        if test_freq and epoch % test_freq == 0:
+            trainer.eval()
 
     # Visualize the STN transformation on some input batch
     # visualize_stn(test_loader, model, device)

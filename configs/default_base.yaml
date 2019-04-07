@@ -1,10 +1,24 @@
 out_dir: results
-dataset_csv: /media/andrei/Samsung_T51/data/dataset.csv
+dataset_csv: dataset/small_upb.csv
+batch_size: 12
+shuffle: true
+num_workers: 10
+epochs: 10000
+batch_log_freq: &batch_log_freq 10
+tb: yes
+save_best: true
+save_all: false
+test_freq: 0
 
 model:
   name: BaseModel
+  pretrained_base: true
 
 train:
-  algorithm: SGD
+  name: TrainDefault
+  batch_log_freq: *batch_log_freq
+  algorithm: RMSprop
   algorithm_args:
-    lr: 0.0001
+    lr: 0.00003
+
+input_size: [128, 128]
