@@ -2,15 +2,14 @@ import numpy as np
 import pandas as pd
 from torch.utils.data.dataset import Dataset
 import cv2
-from typing import Tuple
 
 IMG_H = "img"
 VIDEO_H = "video"
-PTS = "pts"
+VIDEO_H = "video"
 
 
 class CustomDatasetFromImages(Dataset):
-    def __init__(self, csv_path: str, img_size: Tuple, transform=None, fps_sample=3):
+    def __init__(self, csv_path, transform=None, fps_sample=3):
         """
         Args:
             time_diff : (seconds) Dime distance between frames
@@ -20,7 +19,6 @@ class CustomDatasetFromImages(Dataset):
         """
 
         self._time_diff = 1  # Dime distance between frames
-        self._img_size = tuple(img_size)
 
         # Transforms
         self.transforms = transform
@@ -28,7 +26,7 @@ class CustomDatasetFromImages(Dataset):
         # Read the csv file
         self.data_info = data_info = pd.read_csv(csv_path)
 
-        diff_pts = data_info[PTS].values[1:] - data_info[PTS].values[:-1]
+        diff_pts = data_info.pts.values[1:] - data_info.pts.values[:-1]
         diff_pts = diff_pts[diff_pts > 0]
 
         median_diff, mean_diff, std_diff = np.median(diff_pts), diff_pts.mean(), diff_pts.std()
@@ -39,9 +37,9 @@ class CustomDatasetFromImages(Dataset):
         self.dist_frames = median_diff
 
         # Third column is for pts viedo -> get groups based on fps sample
-        bins = np.arange(0, data_info[PTS].max(), 1. / fps_sample)
-        interval = data_info.groupby(VIDEO_H)[PTS].apply(pd.cut, bins=bins,
-                                                        include_lowest=True).values.codes
+        bins = np.arange(0, data_info.pts.max(), 1. / fps_sample)
+        interval = data_info.groupby("video").pts.apply(pd.cut, bins=bins,
+                                                    include_lowest=True).values.codes
         data_info["interval"] = interval
 
         # Calculate len
@@ -59,7 +57,7 @@ class CustomDatasetFromImages(Dataset):
         time_diff = self.time_diff
 
         print("Get first index ...")
-        sample_start_idx = df.groupby([VIDEO_H, "interval"]).apply(lambda x: x.sample())
+        sample_start_idx = df.groupby(["video", "interval"]).apply(lambda x: x.sample())
 
         print("Select second index ...")
         first_idx = sample_start_idx.index.levels[2]
@@ -73,27 +71,20 @@ class CustomDatasetFromImages(Dataset):
         second_idx= second_idx[has_df]
 
         # filter same video
-        same_video = df.loc[first_idx, VIDEO_H].values == df.loc[second_idx, VIDEO_H].values
+        same_video = df.loc[first_idx, "video"].values == df.loc[second_idx, "video"].values
         first_idx = first_idx[same_video]
         second_idx = second_idx[same_video]
 
-        self.first_idx = np.asarray(df.loc[first_idx, IMG_H])
-        self.second_idx = np.asarray(df.loc[second_idx, IMG_H])
+        self.first_idx = np.asarray(df.loc[first_idx, "img"])
+        self.second_idx = np.asarray(df.loc[second_idx, "img"])
 
         self.data_len = len(first_idx)
-
-    def read_img(self, path):
-        img = cv2.imread(path)
-        img = cv2.resize(img, self._img_size)
-        # img = img.transpose((2, 0, 1))
-        # img = img.reshape((1,) + img.shape)
-        return img
 
     def __getitem__(self, index):
         # TODO Reset group indexes after each epoch!
         # Open image
-        img_first = self.read_img(self.first_idx[index])
-        img_second = self.read_img(self.second_idx[index])
+        img_first = cv2.imread(self.first_idx[index])
+        img_second = cv2.imread(self.second_idx[index])
 
         if self.transforms is not None:
             # Transform image to tensor
@@ -112,16 +103,9 @@ class CustomDatasetFromImages(Dataset):
     @time_diff.setter
     def time_diff(self, value):
         self._time_diff = value
-        self.set_groups()
 
 
 if __name__ == "__main__":
     # TODO Check config
 
-    dataset = CustomDatasetFromImages("dataset/small_upb.csv")
-
-    for i in range(10):
-        img1, img2 = dataset[i]
-        cv2.imshow("IMG1", img1)
-        cv2.imshow("IMG2", img2)
-        cv2.waitKey(0)
+    dataset = CustomDatasetFromImages("/media/andrei/Samsung_T51/data/dataset.csv")
