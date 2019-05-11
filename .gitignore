@@ -6,6 +6,7 @@ configs/*
 !configs/**/default*
 configs/default.yaml
 local/
+dataset/
 
 *__pycache__
 *egg-info

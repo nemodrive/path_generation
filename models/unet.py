@@ -3,6 +3,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision.models import resnet18
 
 
 class double_conv(nn.Module):
@@ -88,10 +89,11 @@ class outconv(nn.Module):
         x = self.conv(x)
         return x
 
+
 class UNet(nn.Module):
-    def __init__(self, n_channels, n_classes):
+    def __init__(self, cfg, n_channels, n_classes):
         super(UNet, self).__init__()
-        self.inc = inconv(n_channels, 64)
+        self.inc = inconv(n_channels, 64)  # TODO change base with bigger Resnet18
         self.down1 = down(64, 128)
         self.down2 = down(128, 256)
         self.down3 = down(256, 512)
@@ -113,4 +115,17 @@ class UNet(nn.Module):
         x = self.up3(x, x2)
         x = self.up4(x, x1)
         x = self.outc(x)
-        return F.sigmoid(x)
+        return x
+
+
+if __name__ == "__main__":
+    img = torch.rand(1, 3, 256, 256)
+
+    model = UNet(3, 10)
+
+    out = model(img)
+
+    base = resnet18()
+    base = nn.Sequential(*list(base.children())[:-2])
+    x = base(img)
+    print(x.shape)
