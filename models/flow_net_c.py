@@ -5,7 +5,8 @@ from torchvision.models.resnet import BasicBlock, conv1x1, resnet34
 from argparse import Namespace
 
 import sys
-sys.path.append("flownet2-pytorch")
+sys.path.append("flownet2_pytorch")
+sys.path.append("flownet2_pytorch/networks")
 
 from flownet2_pytorch.networks import FlowNetC
 
@@ -51,6 +52,8 @@ class FlowNet2C(FlowNetC.FlowNetC):
         out_conv5 = self.conv5_1(self.conv5(out_conv4))
         out_conv6 = self.conv6_1(self.conv6(out_conv5))
 
+        print(out_conv6.shape)
+
         flow6 = self.predict_flow6(out_conv6)
         flow6_up = self.upsampled_flow6_to_5(flow6)
         out_deconv5 = self.deconv5(out_conv6)
@@ -84,7 +87,7 @@ if __name__ == "__main__":
     from argparse import Namespace
     cfg = Namespace()
     cfg.rgb_max = 255
-    cfg.fp16 = True
+    cfg.fp16 = False
 
     img = torch.rand(3,3,2,256,256).cuda()
 
