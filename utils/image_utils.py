@@ -43,7 +43,7 @@ def img_coord_2_homogenous(p_coords, normalize: bool = True, width: int = None, 
     if clamp_z > 0:
         z = z.clamp(min=1e-3)  # TODO why?
 
-    img_coord = p_coords[:, :2] / p_coords[:, 2]
+    img_coord = p_coords[:, :2] / p_coords[:, 2].unsqueeze(1)
 
     if normalize:
         x = img_coord[:, 0] / ((width - 1) / 2.) - 1.
@@ -54,7 +54,7 @@ def img_coord_2_homogenous(p_coords, normalize: bool = True, width: int = None, 
 
 
 def reverse_warp(img: torch.Tensor, depth: torch.Tensor, pose: torch.Tensor,
-                 intrinsic: torch.Tensor,
+                 intrinsic: torch.Tensor, distort_coeff: torch.Tensor,
                  rotation_type: str = "euler", padding_mode: str = "zeros"):
     """
 
@@ -71,9 +71,11 @@ def reverse_warp(img: torch.Tensor, depth: torch.Tensor, pose: torch.Tensor,
     # Generate pixel coord  - homogeneous coordinates
     p = sample_pix_coord(img_width, img_height, device=img.device, batch=batch_size)
 
+    # TODO could be useful to correct image for distortion
+
     rot, trans = transform_pose(pose)
 
-    depth_v = depth.view(batch_size, -1)
+    depth_v = depth.view(batch_size, 1, -1)
 
     homo_coord = intrinsic @ rot @ intrinsic.inverse() @ p * depth_v + intrinsic @ trans
 
@@ -85,7 +87,7 @@ def reverse_warp(img: torch.Tensor, depth: torch.Tensor, pose: torch.Tensor,
 
     # Get projected image
     projected_img = F.grid_sample(img, grid, padding_mode=padding_mode)
-    valid_points = grid.abs().max(dim=-1)[0] <= 1
+    valid_points = (grid.abs().max(dim=-1)[0] <= 1).unsqueeze(1)
 
     return projected_img, valid_points
 
@@ -174,13 +176,14 @@ def test_reverse_warp():
 
 
 if __name__ == "__main__":
-    batch_size = 1
+    batch_size = 5
     w = 10
     h = 10
     img = torch.rand(batch_size, 3, h, w)
     depth = torch.rand(batch_size, h, w)
     intrinsic = torch.rand(batch_size, 3, 3)
     pose = torch.rand(batch_size, 6)
+
 
     # ==============================================================================================
 

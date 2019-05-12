@@ -6,7 +6,7 @@ import torchvision
 from torchvision import datasets, transforms
 import matplotlib.pyplot as plt
 import numpy as np
-from torchvision.models.resnet import BasicBlock, conv1x1
+from torch.utils.data import DataLoader
 import pandas as pd
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms
@@ -14,10 +14,9 @@ import os
 from argparse import Namespace
 from liftoff.config import read_config
 
-from utils import dataloader
+from utils import dataloader, config
 from utils.utils import convert_image_np
 from models import get_model
-
 
 
 plt.ion()   # interactive mode
@@ -26,13 +25,12 @@ plt.ion()   # interactive mode
 def train(epoch, train_loader, model, optimizer, device):
     model.train()
     for batch_idx, (data, target) in enumerate(train_loader):
-        data = torch.rand((64, 1, 224, 224))
-        target = torch.rand((64, 1, 224, 224))
         data, target = data.to(device), target.to(device)
 
         optimizer.zero_grad()
-        output = model(data)
-        loss = F.nll_loss(output, target)
+        output = model(data, target)
+
+        loss = model.calculate_loss((data, target), None, output)
         loss.backward()
         optimizer.step()
         if batch_idx % 500 == 0:
@@ -87,9 +85,24 @@ def visualize_stn(test_loader, model, device):
 
 def run(cfg: Namespace) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    dataset_csv = cfg.dataset_csv
+
+    torch.autograd.set_detect_anomaly(True)
+
+    config.add_to_cfg(cfg, subgroups=["model", "train"], new_arg='device', new_arg_value=device)
+    config.add_to_cfg(cfg.model, subgroups=[], new_arg='device', new_arg_value=device)
 
     # TODO change train loader
-    train_loader = dataloader.CustomDatasetFromImages('data/dataset2.csv')
+    transform = transforms.Compose([
+            transforms.Normalize(torch.tensor(cfg.norm_mean),
+                                 torch.tensor(cfg.norm_std))
+        ])
+
+    dataset = dataloader.CustomDatasetFromImages(dataset_csv, transform=transform,
+                                                      device=device, resize=tuple(cfg.input_size))
+
+    train_loader = DataLoader(dataset, batch_size=cfg.batch_size, shuffle=cfg.shuffle,
+                              num_workers=cfg.num_workers)
 
     model = get_model(cfg.model).to(device)
 

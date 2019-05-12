@@ -5,17 +5,26 @@ from torchvision.models.resnet import BasicBlock, conv1x1, resnet34
 from argparse import Namespace
 
 import sys
-sys.path.append("flownet2-pytorch")
+sys.path.append("flownet2_pytorch")
+
 
 from flownet2_pytorch.networks import FlowNetC
 
 
 class FlowNet2C(FlowNetC.FlowNetC):
     def __init__(self, args, batchNorm=False, div_flow=20):
-        super(FlowNet2C, self).__init__(args, batchNorm=batchNorm, div_flow=20)
+        super(FlowNet2C, self).__init__(args, batchNorm=batchNorm, div_flow=div_flow)
         self.rgb_max = args.rgb_max
+        self.last_conv = nn.Sequential(
+            # nn.LeakyReLU(0.1, inplace=True),
+            nn.Conv2d(2, 1, 1),
+            # nn.ReLU(),
+        )
+        self.upsampled_ = nn.ConvTranspose2d(1, 1, 4, 4)
 
-    def forward(self, inputs):
+    def forward(self, x1, x2):
+        inputs = torch.stack([x1, x2], dim=2)
+
         rgb_mean = inputs.contiguous().view(inputs.size()[:2] + (-1,)).mean(dim=-1).view(
             inputs.size()[:2] + (1, 1, 1,))
 
@@ -74,20 +83,24 @@ class FlowNet2C(FlowNetC.FlowNetC):
 
         flow2 = self.predict_flow2(concat2)
 
-        if self.training:
-            return flow2, flow3, flow4, flow5, flow6
-        else:
-            return self.upsample1(flow2 * self.div_flow)
+        # Reduce to 1 channel
+        flow2 = self.last_conv(flow2)
+
+        # last_flow = self.upsample1(flow2)
+        last_flow = self.upsampled_(flow2)
+
+        return out_conv6, last_flow
 
 
 if __name__ == "__main__":
     from argparse import Namespace
     cfg = Namespace()
     cfg.rgb_max = 255
-    cfg.fp16 = True
+    cfg.fp16 = False
 
-    img = torch.rand(3,3,2,256,256).cuda()
+    img = torch.rand(3, 3, 256, 256).cuda()
 
     net = FlowNet2C(cfg).cuda()
 
-    x = net(img)
+    out_conv6, last_flow = net(img, img)
+    print(last_flow.size())

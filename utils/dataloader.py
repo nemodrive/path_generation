@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from torch.utils.data.dataset import Dataset
 import cv2
+import torch
 
 IMG_H = "img"
 VIDEO_H = "video"
@@ -9,7 +10,7 @@ VIDEO_H = "video"
 
 
 class CustomDatasetFromImages(Dataset):
-    def __init__(self, csv_path, transform=None, fps_sample=3):
+    def __init__(self, csv_path: str, transform=None, device="cpu", fps_sample=3, resize=None):
         """
         Args:
             time_diff : (seconds) Dime distance between frames
@@ -21,7 +22,9 @@ class CustomDatasetFromImages(Dataset):
         self._time_diff = 1  # Dime distance between frames
 
         # Transforms
+        self.resize = resize
         self.transforms = transform
+        self.device = device
 
         # Read the csv file
         self.data_info = data_info = pd.read_csv(csv_path)
@@ -81,13 +84,28 @@ class CustomDatasetFromImages(Dataset):
         self.data_len = len(first_idx)
 
     def __getitem__(self, index):
+        resize = self.resize
+
         # TODO Reset group indexes after each epoch!
         # Open image
-        img_first = cv2.imread(self.first_idx[index])
-        img_second = cv2.imread(self.second_idx[index])
+        img_first = cv2.imread(self.first_idx[index])  # type: np.ndarray
+        img_second = cv2.imread(self.second_idx[index])  # type: np.ndarray
+
+        if resize is not None:
+            img_first = cv2.resize(img_first, resize)
+            img_second = cv2.resize(img_second, resize)
 
         if self.transforms is not None:
+            device = self.device
+
+            # transform to channel first
+            img_first = img_first.transpose((2, 0, 1))
+            img_second = img_second.transpose((2, 0, 1))
+
             # Transform image to tensor
+            img_first = torch.tensor(img_first, dtype=torch.float)
+            img_second = torch.tensor(img_second, dtype=torch.float)
+
             img_first = self.transforms(img_first)
             img_second = self.transforms(img_second)
 
