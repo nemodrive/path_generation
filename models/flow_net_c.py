@@ -60,6 +60,8 @@ class FlowNet2C(FlowNetC.FlowNetC):
         out_conv5 = self.conv5_1(self.conv5(out_conv4))
         out_conv6 = self.conv6_1(self.conv6(out_conv5))
 
+        print(out_conv6.shape)
+
         flow6 = self.predict_flow6(out_conv6)
         flow6_up = self.upsampled_flow6_to_5(flow6)
         out_deconv5 = self.deconv5(out_conv6)
