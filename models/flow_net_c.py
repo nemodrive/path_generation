@@ -16,9 +16,9 @@ class FlowNet2C(FlowNetC.FlowNetC):
         super(FlowNet2C, self).__init__(args, batchNorm=batchNorm, div_flow=div_flow)
         self.rgb_max = args.rgb_max
         self.last_conv = nn.Sequential(
-            # nn.LeakyReLU(0.1, inplace=True),
+            nn.LeakyReLU(0.1, inplace=True),
             nn.Conv2d(2, 1, 1),
-            # nn.ReLU(),
+            nn.ReLU(),
         )
         self.upsampled_ = nn.ConvTranspose2d(1, 1, 4, 4)
 
@@ -59,8 +59,6 @@ class FlowNet2C(FlowNetC.FlowNetC):
 
         out_conv5 = self.conv5_1(self.conv5(out_conv4))
         out_conv6 = self.conv6_1(self.conv6(out_conv5))
-
-        print(out_conv6.shape)
 
         flow6 = self.predict_flow6(out_conv6)
         flow6_up = self.upsampled_flow6_to_5(flow6)

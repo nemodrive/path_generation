@@ -20,9 +20,6 @@ def transform_pose(pose: torch.Tensor, rotation_mode = 'euler'):
     :param pose: dim [B, 6]
     :return: rot_and_translation
     """
-    rot = torch.rand(pose.size(0), 3, 3)
-    transp = torch.rand(pose.size(0), 3, 1)
-
     # ==============================================================================================
     # @ from SfmLearner 
     transp = pose[:, :3].unsqueeze(-1)  # [B, 3, 1]
@@ -43,7 +40,7 @@ def img_coord_2_homogenous(p_coords, normalize: bool = True, width: int = None, 
     if clamp_z > 0:
         z = z.clamp(min=1e-3)  # TODO why?
 
-    img_coord = p_coords[:, :2] / p_coords[:, 2].unsqueeze(1)
+    img_coord = p_coords[:, :2] / z.unsqueeze(1)
 
     if normalize:
         x = img_coord[:, 0] / ((width - 1) / 2.) - 1.

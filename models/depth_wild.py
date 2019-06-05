@@ -80,18 +80,16 @@ class DepthWild(nn.Module):
         projected_img, valid_points, mask_prediction = model_out
 
         loss_cfg = self.loss_cfg
+        diff = (projected_img - x1)
+        diff = diff.abs().mean(1).unsqueeze(1)
 
-        diff = (x1 - projected_img).abs().mean(1).unsqueeze(1)
-
-        # diff_wm = diff * valid_points.float() #* mask_prediction
-        diff_wm = diff * mask_prediction
+        diff_wm = diff * valid_points.float() * mask_prediction
 
         loss_diff = diff_wm.mean()
 
         # Cross entropy for mask
-        mask_prediction.zero_()
         target = torch.ones_like(mask_prediction)
-        loss_reg_mask = - nn.BCELoss()(mask_prediction, target)
+        loss_reg_mask = - nn.BCEWithLogitsLoss()(mask_prediction, target)
 
         loss = loss_cfg.l1_coeff * loss_diff + loss_reg_mask
 

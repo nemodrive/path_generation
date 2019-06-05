@@ -1,18 +1,11 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
 import torchvision
-from torchvision import datasets, transforms
 import matplotlib.pyplot as plt
-import numpy as np
 from torch.utils.data import DataLoader
-import pandas as pd
-from torch.utils.data.dataset import Dataset
 from torchvision import transforms
 import os
 from argparse import Namespace
-from liftoff.config import read_config
 
 from utils import dataloader, config
 from utils.utils import convert_image_np
@@ -88,6 +81,8 @@ def run(cfg: Namespace) -> None:
     dataset_csv = cfg.dataset_csv
 
     torch.autograd.set_detect_anomaly(True)
+    # torch.backends.cudnn.deterministic = True
+    # torch.backends.cudnn.benchmark = False
 
     config.add_to_cfg(cfg, subgroups=["model", "train"], new_arg='device', new_arg_value=device)
     config.add_to_cfg(cfg.model, subgroups=[], new_arg='device', new_arg_value=device)
@@ -143,4 +138,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    from liftoff import parse_opts
+    run(parse_opts())
