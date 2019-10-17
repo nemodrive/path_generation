@@ -40,6 +40,7 @@ from torchvision.models.resnet import BasicBlock, conv1x1
 import pandas as pd
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms
+import torch_geometric
 import cv2
 
 plt.ion()   # interactive mode

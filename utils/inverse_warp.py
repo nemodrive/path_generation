@@ -1,6 +1,7 @@
 from __future__ import division
 import torch
 import torch.nn.functional as F
+import torchgeometry
 
 pixel_coords = None
 
@@ -13,6 +14,7 @@ def set_id_grid(depth):
     ones = torch.ones(1,h,w).type_as(depth)
 
     pixel_coords = torch.stack((j_range, i_range, ones), dim=1)  # [1, 3, H, W]
+
 
 
 def check_sizes(input, input_name, expected):
@@ -315,26 +317,53 @@ def main():
 
     img /= 255.0
 
-    print(img)
-
     cv2.imshow("rgb", img)
     cv2.waitKey(0)
 
     img_tensor = torch.tensor(img).unsqueeze(0).float()
     img_tensor = img_tensor.permute(0, 3, 1, 2)
-    depth_tensor = torch.tensor(depth).unsqueeze(0).float()
+    depth_tensor = 255.0 - torch.tensor(depth).unsqueeze(0).float()
 
-    pose = torch.tensor([[-0.3, -0.0, -0.0, -0.0, -0.0, 0.0]]).float()
+    pose = torch.tensor([[-0.1, 0.3, -0.0, 0., -0., 0.5]]).float()
 
-    intrinsic = torch.tensor(np.array([[1081.37, 1, 256], [0, 1081.37, 256], [0, 0, 1]])).unsqueeze(0).float()
+    intrinsic = torch.tensor(np.array([[9.597910e+02, 0.000000e+00, 6.960217e+02],
+                                       [0.000000e+00, 9.569251e+02, 2.241806e+02],
+                                       [0.000000e+00, 0.000000e+00, 1.000000e+00]])).unsqueeze(0).float()
 
-    res, valid_points = inverse_warp(img_tensor, depth_tensor, pose, intrinsic)
+    def nothing(x):
+        pass
 
-    print(res.shape, valid_points.shape)
-    res = res.cpu().numpy()[0]
-    res = np.transpose(res, (1, 2, 0))
-    cv2.imshow('cubeeee', res)
-    cv2.waitKey(0)
+    cv2.namedWindow('image')
+
+    ticks = 600
+    middle = ticks // 2
+
+    # create trackbars for color change
+    cv2.createTrackbar('tx', 'image', middle, ticks, nothing)
+    cv2.createTrackbar('ty', 'image', middle, ticks, nothing)
+    cv2.createTrackbar('tz', 'image', middle, ticks, nothing)
+    cv2.createTrackbar('rx', 'image', middle, ticks, nothing)
+    cv2.createTrackbar('ry', 'image', middle, ticks, nothing)
+    cv2.createTrackbar('rz', 'image', middle, ticks, nothing)
+
+    while True:
+        res, valid_points = inverse_warp(img_tensor, depth_tensor, pose, intrinsic)
+        res = res.cpu().numpy()[0]
+        res = np.transpose(res, (1, 2, 0))
+        cv2.imshow('image', res)
+        k = cv2.waitKey(1) & 0xFF
+        if k == 27:
+            break
+
+        tx = (cv2.getTrackbarPos('tx', 'image') - middle) / 100
+        ty = (cv2.getTrackbarPos('ty', 'image') - middle) / 100
+        tz = (cv2.getTrackbarPos('tz', 'image') - middle) / 100
+        rx = (cv2.getTrackbarPos('rx', 'image') - middle) / 100
+        ry = (cv2.getTrackbarPos('ry', 'image') - middle) / 100
+        rz = (cv2.getTrackbarPos('rz', 'image') - middle) / 100
+
+        pose = torch.tensor([[tx, ty, tz, rx, ry, rz]]).float()
+
 
 if __name__ == '__main__':
     main()
