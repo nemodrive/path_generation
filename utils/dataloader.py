@@ -91,6 +91,13 @@ class CustomDatasetFromImages(Dataset):
         img_first = cv2.imread(self.first_idx[index])  # type: np.ndarray
         img_second = cv2.imread(self.second_idx[index])  # type: np.ndarray
 
+        '''
+        cv2.imshow('1', img_first)
+        cv2.waitKey(0)
+        cv2.imshow('2', img_second)
+        cv2.waitKey(0)
+        '''
+
         if resize is not None:
             img_first = cv2.resize(img_first, resize)
             img_second = cv2.resize(img_second, resize)

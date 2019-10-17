@@ -60,7 +60,7 @@ def cam2pixel(cam_coords, rot, tr, padding_mode):
         pcoords = pcoords + tr  # [B, 3, H*W]
     X = pcoords[:, 0]
     Y = pcoords[:, 1]
-    Z = pcoords[:, 2] #.clamp(min=1e-3)
+    Z = pcoords[:, 2].clamp(min=1e-3)
 
     X_norm = 2*(X / Z)/(w-1) - 1  # Normalized, -1 if on extreme left, 1 if on extreme right (x = w-1) [B, H*W]
     Y_norm = 2*(Y / Z)/(h-1) - 1  # Idem [B, H*W]
@@ -186,3 +186,155 @@ def inverse_warp(img, depth, pose, intrinsic, rotation_mode='euler', padding_mod
     valid_points = src_pixel_coords.abs().max(dim=-1)[0] <= 1
 
     return projected_img, valid_points
+
+
+def main():
+    from PIL import Image
+    import numpy as np
+    import cv2
+    import h5py
+    import matplotlib.pyplot as plt
+
+    def rgb2gray(rgb):
+        r, g, b = rgb[:, :, 0], rgb[:, :, 1], rgb[:, :, 2]
+        gray = 0.2989 * r + 0.5870 * g + 0.1140 * b
+        return gray
+
+    # img_file = '/HDD1_2TB/storage/dimlrgbd/train/HR/12. Livingroom/color/in_01_160217_123138_c.png'
+    # img = Image.open(img_file)
+    # img = np.array(img)
+    # print(img.shape)
+    # cv2.imshow('original', img)
+    # cv2.waitKey(0)
+    # img_tensor = torch.tensor(img).unsqueeze(0).float()
+    # img_tensor = img_tensor.permute(0, 3, 1, 2) / 255.0
+    #
+    # depth_file = '/HDD1_2TB/storage/dimlrgbd/train/HR/12. Livingroom/depth_filled/in_01_160217_123138_depth_filled.png'
+    # depth = Image.open(depth_file)
+    # depth = np.array(depth)
+    # depth_tensor = torch.tensor(depth).unsqueeze(0).float()
+    # print(depth_tensor.max())
+    # # depth_tensor /= depth_tensor.max()
+    # # cv2.imshow('depth', depth)
+    # # cv2.waitKey(0)
+    #
+    # pose = torch.tensor([[200.0, -200.0, -150.0, -0.0, -0.35, 0.35]]).float()
+    #
+    # intrinsic_file = '/HDD1_2TB/storage/rgbd/band_aid_clear_strips/calibration.h5'
+    # h5_intrinsic = h5py.File(intrinsic_file)
+    # # for a, b in h5_intrinsic.items():
+    # #     print(a, b)
+    #
+    # intrinsic = torch.tensor(np.array([[1081.37, 1, 959.5], [0, 1081.37, 539.5], [0, 0, 1]])).unsqueeze(0).float()
+    #
+    # print(intrinsic)
+    #
+    # print(img_tensor.shape, depth_tensor.shape, intrinsic.shape)
+    #
+    # res, valid_points = inverse_warp(img_tensor, depth_tensor, pose, intrinsic)
+    #
+    # print(res.shape, valid_points.shape)
+    #
+    # res = res.cpu().numpy()[0]
+    # res = np.transpose(res, (1, 2, 0))
+    # cv2.imshow('res', res)
+    # cv2.waitKey(0)
+
+    # img_file = '/HDD1_2TB/storage/rgbd/band_aid_clear_strips/NP1_0.jpg'
+    # img = Image.open(img_file)
+    # img = np.array(img)
+    # #img = cv2.resize(img, (640, 480))
+    # cv2.imshow('original', img)
+    # cv2.waitKey(0)
+    # img_tensor = torch.tensor(img).unsqueeze(0).float()
+    # img_tensor = img_tensor.permute(0, 3, 1, 2) / 255.0
+    #
+    # depth_file = '/HDD1_2TB/storage/rgbd/band_aid_clear_strips/NP1_0.h5'
+    # h5_depth = h5py.File(depth_file)
+    # depth_tensor = torch.tensor(np.array(h5_depth.get('depth')).astype(float)).unsqueeze(0).float()
+    # # depth = np.array(depth).astype(float)
+    # print(depth_tensor.max())
+    # depth_tensor[depth_tensor == 0] = 1
+    # depth_tensor /= depth_tensor.max()
+    # # cv2.imshow('depth', depth)
+    # # cv2.waitKey(0)
+    #
+    # pose = torch.tensor([[0.0, -0.0, -0.0, -0.0, 0.09, -0.0]]).float()
+    #
+    # intrinsic_file = '/HDD1_2TB/storage/rgbd/band_aid_clear_strips/calibration.h5'
+    # h5_intrinsic = h5py.File(intrinsic_file)
+    # # for a, b in h5_intrinsic.items():
+    # #     print(a, b)
+    #
+    # intrinsic = torch.tensor(np.array(h5_intrinsic.get('N1_rgb_K')).astype(float)).unsqueeze(0).float() / 2.0
+    #
+    # print(intrinsic)
+    #
+    # print(img_tensor.shape, depth_tensor.shape, intrinsic.shape)
+    #
+    # res, valid_points = inverse_warp(img_tensor, depth_tensor, pose, intrinsic)
+    #
+    # print(res.shape, valid_points.shape)
+
+    # res = res.cpu().numpy()[0]
+    # res = np.transpose(res, (1, 2, 0))
+    # cv2.imshow('res', res)
+    # cv2.waitKey(0)
+
+    # draw cube
+    w = 512
+    hw = w // 2
+    depth = np.zeros((w, w), dtype=np.uint8)
+    img = np.zeros((w, w, 3), dtype=float)
+    depth.fill(10)
+
+    cube_front_w = 100 // 2
+    cube_back_w = 40 // 2
+    cube_depth_w = 20
+    cube_start_depth = 1
+    cube_back_depth = 7
+
+    depth[hw - cube_front_w: hw + cube_front_w, hw - cube_front_w: hw + cube_front_w] = cube_start_depth
+
+    depths = np.linspace(cube_back_depth, cube_start_depth, cube_depth_w)
+    depth_ws = np.linspace(cube_back_w, cube_front_w, cube_depth_w)
+    for i, row in enumerate(range(hw - cube_front_w - cube_depth_w, hw - cube_front_w)):
+        offset = int(depth_ws[i])
+        depth[row, hw - offset: hw + offset] = depths[i]
+
+    depth = depth * (255 // depth.max())
+
+    cv2.imshow("depth", depth)
+    cv2.waitKey(0)
+
+    for i in range(w):
+        for j in range(w):
+            img[i, j, 2] = 255 - depth[i, j]
+            if img[i, j, 2] < 10:
+                img[i, j, :] = 255
+
+    img /= 255.0
+
+    print(img)
+
+    cv2.imshow("rgb", img)
+    cv2.waitKey(0)
+
+    img_tensor = torch.tensor(img).unsqueeze(0).float()
+    img_tensor = img_tensor.permute(0, 3, 1, 2)
+    depth_tensor = torch.tensor(depth).unsqueeze(0).float()
+
+    pose = torch.tensor([[-0.3, -0.0, -0.0, -0.0, -0.0, 0.0]]).float()
+
+    intrinsic = torch.tensor(np.array([[1081.37, 1, 256], [0, 1081.37, 256], [0, 0, 1]])).unsqueeze(0).float()
+
+    res, valid_points = inverse_warp(img_tensor, depth_tensor, pose, intrinsic)
+
+    print(res.shape, valid_points.shape)
+    res = res.cpu().numpy()[0]
+    res = np.transpose(res, (1, 2, 0))
+    cv2.imshow('cubeeee', res)
+    cv2.waitKey(0)
+
+if __name__ == '__main__':
+    main()

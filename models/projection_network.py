@@ -19,14 +19,14 @@ class ProjectionNet(nn.Module):
             nn.Conv2d(channels, hidden_size, 1),
             nn.BatchNorm2d(hidden_size),
             nn.ReLU(inplace=True),
-            nn.Conv2d(hidden_size, 3, (w, h)),
+            nn.Conv2d(hidden_size, 3, (w, h))
         )
 
         self.rotation_net = nn.Sequential(
             nn.Conv2d(channels, hidden_size, 1),
             nn.BatchNorm2d(hidden_size),
             nn.ReLU(inplace=True),
-            nn.Conv2d(hidden_size, 3, (w, h)),
+            nn.Conv2d(hidden_size, 3, (w, h))
         )
 
         groups = 6
@@ -35,7 +35,7 @@ class ProjectionNet(nn.Module):
             nn.Conv2d(channels, hidden_groups, 1),
             nn.BatchNorm2d(hidden_groups),
             nn.ReLU(inplace=True),
-            nn.Conv2d(hidden_groups, 6, (w, h), groups=6),
+            nn.Conv2d(hidden_groups, 6, (w, h), groups=6)
         )
 
         self.intrinsic_base = torch.zeros(1, 9, device=device)
@@ -68,4 +68,4 @@ class ProjectionNet(nn.Module):
         intrinsic_base = intrinsic_base.scatter_add(1, intrinsic_pid, intrinsic_param)
         intrinsic = intrinsic_base.view(-1, 3, 3)
 
-        return tr, rot, intrinsic, distort_coef
+        return torch.rand_like(tr), torch.rand_like(rot), torch.rand_like(intrinsic), distort_coef

@@ -15,7 +15,7 @@ def sample_pix_coord(img_width: int, img_height: int, device="cpu", batch: int =
     return p
 
 
-def transform_pose(pose: torch.Tensor, rotation_mode = 'euler'):
+def transform_pose(pose: torch.tensor, rotation_mode = 'euler'):
     """
     :param pose: dim [B, 6]
     :return: rot_and_translation
@@ -50,8 +50,8 @@ def img_coord_2_homogenous(p_coords, normalize: bool = True, width: int = None, 
     return img_coord
 
 
-def reverse_warp(img: torch.Tensor, depth: torch.Tensor, pose: torch.Tensor,
-                 intrinsic: torch.Tensor, distort_coeff: torch.Tensor,
+def reverse_warp(img: torch.tensor, depth: torch.tensor, pose: torch.tensor,
+                 intrinsic: torch.tensor, distort_coeff: torch.tensor,
                  rotation_type: str = "euler", padding_mode: str = "zeros"):
     """
 

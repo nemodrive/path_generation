@@ -39,7 +39,8 @@ class DepthWild(nn.Module):
 
         #  -- Network 1
         # Depth network's input is the source image in [B, C, H, W]
-        self.depth_network = get_model(depth_network_cfg, n_channels=in_channels, n_classes=1)
+        #self.depth_network = get_model(depth_network_cfg, n_channels=in_channels, n_classes=1)
+        self.depth_network = get_model(depth_network_cfg, n_classes=1)
         self.depth_network = self.depth_network.to(device)
 
         # -- Network 2
@@ -65,6 +66,11 @@ class DepthWild(nn.Module):
         depth = F.softplus(depth)
         depth = depth.squeeze(1)
 
+        import cv2
+        #print(depth.detach().cpu().numpy().shape)
+        #cv2.imshow('depth', depth.detach().cpu().numpy()[0])
+        #cv2.waitKey(0)
+
         motion_embedding, mask_prediction = self.motion_network(x1, x2)
 
         tr, rot, intrinsic, distort_coef = self.projection_net(motion_embedding)
@@ -89,14 +95,9 @@ class DepthWild(nn.Module):
 
         # Cross entropy for mask
         target = torch.ones_like(mask_prediction)
-        loss_reg_mask = - nn.BCEWithLogitsLoss()(mask_prediction, target)
+        loss_reg_mask = nn.BCEWithLogitsLoss()(mask_prediction, target)
 
         loss = loss_cfg.l1_coeff * loss_diff + loss_reg_mask
 
         return loss
-
-
-
-
-
 
