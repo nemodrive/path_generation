@@ -322,7 +322,7 @@ def main():
 
     img_tensor = torch.tensor(img).unsqueeze(0).float()
     img_tensor = img_tensor.permute(0, 3, 1, 2)
-    depth_tensor = 255.0 - torch.tensor(depth).unsqueeze(0).float()
+    depth_tensor = torch.tensor(depth).unsqueeze(0).float()
 
     pose = torch.tensor([[-0.1, 0.3, -0.0, 0., -0., 0.5]]).float()
 
